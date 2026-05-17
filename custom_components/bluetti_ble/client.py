@@ -32,6 +32,8 @@ from .const import (
     REG_APP_HOME_DATA,
     REG_BASE_CONFIG,
     REG_BASE_CONFIG_LEN,
+    REG_PACK_MAIN_INFO,
+    REG_PACK_MAIN_INFO_BATTERY_LEN,
     WRITE_CHAR_UUID,
     WRITE_CHUNK_DELAY,
     WRITE_CHUNK_SIZE,
@@ -118,7 +120,23 @@ class BluettiBleClient:
 
                 reg_len = _get_home_data_reg_len(self._protocol_version)
                 payload = await self._async_read_register(REG_APP_HOME_DATA, reg_len)
-                return _parse_home_data(payload, self._protocol_version)
+                home_data = _parse_home_data(payload, self._protocol_version)
+
+                try:
+                    pack_main_payload = await self._async_read_register(
+                        REG_PACK_MAIN_INFO,
+                        REG_PACK_MAIN_INFO_BATTERY_LEN,
+                    )
+                except (BleakError, TimeoutError, ValueError, InvalidSignature, BluettiBleError):
+                    _LOGGER.debug(
+                        "Failed to read PACK_MAIN_INFO for %s",
+                        self._address,
+                        exc_info=True,
+                    )
+                else:
+                    _apply_pack_main_battery_data(home_data, pack_main_payload)
+
+                return home_data
             except (BleakError, TimeoutError, ValueError, InvalidSignature) as err:
                 await self._async_disconnect_locked()
                 raise BluettiBleError(str(err)) from err
@@ -466,6 +484,23 @@ def _parse_home_data(payload: bytes, protocol_version: int) -> BluettiHomeData:
         pack_charge_energy_total=pack_charge_energy_total,
         car_output_power=read_u16_optional(164),
         ev_output_power=ev_output_power,
+    )
+
+
+def _apply_pack_main_battery_data(home_data: BluettiHomeData, payload: bytes) -> None:
+    if len(payload) < REG_PACK_MAIN_INFO_BATTERY_LEN * 2:
+        raise BluettiBleError("Pack main payload is too short")
+
+    home_data.pack_count = min(payload[3], 16)
+    home_data.battery_voltage = int.from_bytes(payload[6:8], byteorder="big", signed=False) / 10
+    home_data.battery_current = int.from_bytes(payload[8:10], byteorder="big", signed=False) / 10
+    home_data.battery_soc = payload[11]
+    home_data.pack_charging_status = payload[19]
+    home_data.pack_charge_full_time = int.from_bytes(payload[34:36], byteorder="big", signed=False)
+    home_data.pack_discharge_empty_time = int.from_bytes(
+        payload[36:38],
+        byteorder="big",
+        signed=False,
     )
 
 
