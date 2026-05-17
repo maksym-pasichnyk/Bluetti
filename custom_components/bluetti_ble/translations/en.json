@@ -1,7 +1,21 @@
 {
   "config": {
+    "step": {
+      "bluetooth_confirm": {
+        "title": "Add discovered device",
+        "description": "Home Assistant discovered {name} ({address}) via Bluetooth. Confirm to add it."
+      },
+      "user": {
+        "title": "Select device",
+        "description": "Choose a discovered Bluetti BLE device to add.",
+        "data": {
+          "address": "Device"
+        }
+      }
+    },
     "abort": {
-      "manual_setup_not_supported": "This integration is added only through Bluetooth discovery."
+      "already_configured": "This device is already configured.",
+      "no_devices_found": "No discovered Bluetti BLE devices are currently available to add."
     }
   }
 }
