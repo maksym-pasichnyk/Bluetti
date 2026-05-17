@@ -1,0 +1,7 @@
+{
+  "config": {
+    "abort": {
+      "manual_setup_not_supported": "This integration is added only through Bluetooth discovery."
+    }
+  }
+}

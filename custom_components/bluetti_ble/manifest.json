@@ -1,0 +1,17 @@
+{
+  "domain": "bluetti_ble",
+  "name": "Bluetti BLE",
+  "bluetooth": [
+    {
+      "local_name": "AC200L*",
+      "service_uuid": "0000ff00-0000-1000-8000-00805f9b34fb",
+      "connectable": true
+    }
+  ],
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "version": "0.1.0"
+}
