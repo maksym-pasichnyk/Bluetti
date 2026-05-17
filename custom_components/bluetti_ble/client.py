@@ -60,6 +60,34 @@ class BluettiHomeData:
     pv_input_power: int
     grid_power: int
     inverter_power: int
+    pack_charging_status: int | None = None
+    pack_charge_full_time: int | None = None
+    pack_discharge_empty_time: int | None = None
+    pack_aging_status: int | None = None
+    pack_aging_progress: int | None = None
+    pack_aging_fault: int | None = None
+    pack_count: int | None = None
+    inverter_count: int | None = None
+    inverter_power_type: int | None = None
+    grid_parallel_soc: int | None = None
+    total_dc_energy: float | None = None
+    total_ac_energy: float | None = None
+    total_pv_charging_energy: float | None = None
+    total_grid_charging_energy: float | None = None
+    total_feedback_energy: float | None = None
+    charging_mode: int | None = None
+    inverter_working_status: int | None = None
+    pv_to_ac_energy: float | None = None
+    self_sufficiency_rate: int | None = None
+    pv_to_ac_power: int | None = None
+    pack_discharge_energy_total: float | None = None
+    rated_voltage: int | None = None
+    rated_frequency: int | None = None
+    scene_flag: int | None = None
+    sleep_standby_time: int | None = None
+    pack_charge_energy_total: int | None = None
+    car_output_power: int | None = None
+    ev_output_power: int | None = None
 
 
 class BluettiBleClient:
@@ -357,6 +385,40 @@ def _parse_home_data(payload: bytes, protocol_version: int) -> BluettiHomeData:
     if len(payload) < 100:
         raise BluettiBleError("Home data payload is too short for AC200L")
 
+    def read_u8_optional(offset: int) -> int | None:
+        if len(payload) <= offset:
+            return None
+        return payload[offset]
+
+    def read_u16_optional(offset: int) -> int | None:
+        if len(payload) < offset + 2:
+            return None
+        return int.from_bytes(payload[offset : offset + 2], byteorder="big", signed=False)
+
+    def read_u32_optional(offset: int) -> int | None:
+        if len(payload) < offset + 4:
+            return None
+        return _swap_u32(payload[offset : offset + 4])
+
+    def read_s32_optional(offset: int) -> int | None:
+        if len(payload) < offset + 4:
+            return None
+        return _swap_s32(payload[offset : offset + 4])
+
+    pack_aging_info = read_u16_optional(12)
+    pack_count = read_u8_optional(15)
+    total_dc_energy = read_u32_optional(100)
+    total_ac_energy = read_u32_optional(104)
+    total_pv_charging_energy = read_u32_optional(108)
+    total_grid_charging_energy = read_u32_optional(112)
+    total_feedback_energy = read_u32_optional(116)
+    pv_to_ac_energy = read_u32_optional(124)
+    pv_to_ac_power = read_u32_optional(130)
+    pack_discharge_energy_total = read_u32_optional(134)
+    sleep_standby_time = read_u32_optional(156)
+    pack_charge_energy_total = read_u32_optional(160)
+    ev_output_power = read_u32_optional(166)
+
     return BluettiHomeData(
         protocol_version=protocol_version,
         model=_parse_swapped_ascii(payload[20:32]),
@@ -368,6 +430,42 @@ def _parse_home_data(payload: bytes, protocol_version: int) -> BluettiHomeData:
         pv_input_power=_swap_u32(payload[88:92]),
         grid_power=_swap_s32(payload[92:96]),
         inverter_power=_swap_s32(payload[96:100]),
+        pack_charging_status=read_u16_optional(6),
+        pack_charge_full_time=read_u16_optional(8),
+        pack_discharge_empty_time=read_u16_optional(10),
+        pack_aging_status=pack_aging_info & 0x0F if pack_aging_info is not None else None,
+        pack_aging_progress=(pack_aging_info >> 4) & 0x0F if pack_aging_info is not None else None,
+        pack_aging_fault=(pack_aging_info >> 8) & 0x0F if pack_aging_info is not None else None,
+        pack_count=min(pack_count, 16) if pack_count is not None else None,
+        inverter_count=read_u8_optional(41),
+        inverter_power_type=read_u8_optional(45),
+        grid_parallel_soc=read_u8_optional(51),
+        total_dc_energy=total_dc_energy / 10 if total_dc_energy is not None else None,
+        total_ac_energy=total_ac_energy / 10 if total_ac_energy is not None else None,
+        total_pv_charging_energy=(
+            total_pv_charging_energy / 10 if total_pv_charging_energy is not None else None
+        ),
+        total_grid_charging_energy=(
+            total_grid_charging_energy / 10 if total_grid_charging_energy is not None else None
+        ),
+        total_feedback_energy=(
+            total_feedback_energy / 10 if total_feedback_energy is not None else None
+        ),
+        charging_mode=read_u8_optional(121),
+        inverter_working_status=read_u8_optional(123),
+        pv_to_ac_energy=pv_to_ac_energy / 10 if pv_to_ac_energy is not None else None,
+        self_sufficiency_rate=read_u8_optional(129),
+        pv_to_ac_power=pv_to_ac_power,
+        pack_discharge_energy_total=(
+            pack_discharge_energy_total / 10 if pack_discharge_energy_total is not None else None
+        ),
+        rated_voltage=read_u16_optional(138),
+        rated_frequency=read_u16_optional(140),
+        scene_flag=read_u8_optional(151),
+        sleep_standby_time=sleep_standby_time,
+        pack_charge_energy_total=pack_charge_energy_total,
+        car_output_power=read_u16_optional(164),
+        ev_output_power=ev_output_power,
     )
 
 
